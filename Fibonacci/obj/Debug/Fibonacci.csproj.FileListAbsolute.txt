@@ -1,0 +1,9 @@
+C:\Users\MR.ROBOT\Desktop\Fibonacci\Fibonacci\bin\Debug\Fibonacci.exe.config
+C:\Users\MR.ROBOT\Desktop\Fibonacci\Fibonacci\obj\Debug\Fibonacci.csprojResolveAssemblyReference.cache
+C:\Users\MR.ROBOT\Desktop\Fibonacci\Fibonacci\obj\Debug\Fibonacci.Form1.resources
+C:\Users\MR.ROBOT\Desktop\Fibonacci\Fibonacci\obj\Debug\Fibonacci.Properties.Resources.resources
+C:\Users\MR.ROBOT\Desktop\Fibonacci\Fibonacci\obj\Debug\Fibonacci.csproj.GenerateResource.Cache
+C:\Users\MR.ROBOT\Desktop\Fibonacci\Fibonacci\bin\Debug\Fibonacci.exe
+C:\Users\MR.ROBOT\Desktop\Fibonacci\Fibonacci\bin\Debug\Fibonacci.pdb
+C:\Users\MR.ROBOT\Desktop\Fibonacci\Fibonacci\obj\Debug\Fibonacci.exe
+C:\Users\MR.ROBOT\Desktop\Fibonacci\Fibonacci\obj\Debug\Fibonacci.pdb
