@@ -1,0 +1,226 @@
+package com.example.healthcheckapp;
+
+import android.content.Intent;  // وارد کردن کلاس Intent برای جابجایی بین اکتیویتی‌ها
+import android.graphics.Color;  // وارد کردن کلاس Color برای استفاده از رنگ‌ها
+import android.os.Bundle;  // وارد کردن کلاس Bundle برای مدیریت داده‌ها در اکتیویتی‌ها
+import android.view.Gravity;  // وارد کردن کلاس Gravity برای تنظیم موقعیت نمایش
+import android.view.MenuItem;  // وارد کردن کلاس MenuItem برای مدیریت آیتم‌های منو
+import android.view.ViewGroup;  // وارد کردن کلاس ViewGroup برای مدیریت چیدمان ویوها
+import android.widget.LinearLayout;  // وارد کردن کلاس LinearLayout برای مدیریت چیدمان به صورت خطی
+import android.widget.TextView;  // وارد کردن کلاس TextView برای نمایش متن
+import android.widget.Toast;  // وارد کردن کلاس Toast برای نمایش پیغام‌های کوتاه
+import androidx.appcompat.app.AppCompatActivity;  // وارد کردن کلاس AppCompatActivity برای ایجاد اکتیویتی
+import androidx.cardview.widget.CardView;  // وارد کردن کلاس CardView برای نمایش کارت‌ها
+import androidx.core.view.GravityCompat;  // وارد کردن کلاس GravityCompat برای مدیریت گراویتی
+import androidx.drawerlayout.widget.DrawerLayout;  // وارد کردن کلاس DrawerLayout برای مدیریت کشوی منو
+import com.google.android.material.navigation.NavigationView;  // وارد کردن کلاس NavigationView برای نمایش منو
+import com.example.healthcheckapp.utils.LocaleManager;  // وارد کردن کلاس LocaleManager برای مدیریت زبان
+import com.example.healthcheckapp.utils.ThemeManager;  // وارد کردن کلاس ThemeManager برای مدیریت تم
+import org.json.JSONArray;  // وارد کردن کلاس JSONArray برای کار با داده‌های JSON به صورت آرایه
+import org.json.JSONObject;  // وارد کردن کلاس JSONObject برای کار با داده‌های JSON به صورت شیء
+import java.io.BufferedReader;  // وارد کردن کلاس BufferedReader برای خواندن داده‌ها از ورودی
+import java.io.InputStreamReader;  // وارد کردن کلاس InputStreamReader برای خواندن داده‌ها از استریم ورودی
+import java.net.HttpURLConnection;  // وارد کردن کلاس HttpURLConnection برای برقراری ارتباط با سرور
+import java.net.URL;  // وارد کردن کلاس URL برای مدیریت URL‌ها
+import android.os.Handler;  // وارد کردن کلاس Handler برای مدیریت اجرای کد به صورت تأخیری
+import android.os.Looper;  // وارد کردن کلاس Looper برای مدیریت نخ‌ها در اندروید
+
+public class TopScoresActivity extends AppCompatActivity {
+
+    LinearLayout scoreListLayout;  // تعریف متغیری از نوع LinearLayout برای نمایش لیست امتیازات
+    private DrawerLayout drawerLayout;  // تعریف متغیری از نوع DrawerLayout برای مدیریت کشوی منو
+    private NavigationView navigationView;  // تعریف متغیری از نوع NavigationView برای مدیریت منو
+    private static String lastLanguage = null;  // تعریف متغیری برای ذخیره زبان آخرین بار استفاده شده
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        // اعمال تم بر اساس حالت تاریک یا روشن
+        if (ThemeManager.isDarkMode(this)) {
+            setTheme(R.style.Theme_MyApp_Dark);  // اگر حالت تاریک است، تم تاریک را اعمال کن
+        } else {
+            setTheme(R.style.Theme_MyApp_Light);  // در غیر این صورت تم روشن را اعمال کن
+        }
+
+        String currentLang = LocaleManager.getLanguage(this);  // دریافت زبان فعلی
+        if (lastLanguage == null) {
+            lastLanguage = currentLang;  // اگر زبان قبلی ذخیره نشده است، زبان فعلی را ذخیره کن
+        }
+        // تنظیم زبان برنامه به زبان فعلی
+        LocaleManager.setLocale(this, currentLang);
+
+        // مخفی کردن نوار ابزار
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();  // اگر نوار ابزار وجود دارد، آن را مخفی کن
+        }
+
+        super.onCreate(savedInstanceState);  // فراخوانی متد پایه
+        setContentView(R.layout.activity_topscores);  // تنظیم محتوای اکتیویتی به لایه activity_topscores
+
+        // مقداردهی اولیه به ویوها
+        CardView cardView = findViewById(R.id.scoresCardView);  // یافتن CardView بر اساس ID
+        scoreListLayout = findViewById(R.id.scoresContainer);  // یافتن LinearLayout برای نمایش لیست امتیازات
+        drawerLayout = findViewById(R.id.drawer_layout);  // یافتن DrawerLayout
+        navigationView = findViewById(R.id.navigation_view);  // یافتن NavigationView برای نمایش منو
+
+        // باز کردن منو کشویی زمانی که دکمه کلیک می‌شود
+        findViewById(R.id.btnOpenMenu).setOnClickListener(v -> drawerLayout.openDrawer(GravityCompat.END));  // باز کردن منو از سمت راست
+
+        // تنظیم شنونده برای انتخاب آیتم‌های منو
+        navigationView.setNavigationItemSelectedListener(this::handleNavigation);
+
+        // فراخوانی متد برای دریافت امتیازات برتر
+        getHighScores();
+
+        // تغییر رنگ پس‌زمینه CardView بر اساس تم
+        if (ThemeManager.isDarkMode(this)) {
+            cardView.setCardBackgroundColor(Color.parseColor("#0f4b6f"));  // رنگ آبی تیره برای تم تاریک
+        } else {
+            cardView.setCardBackgroundColor(Color.parseColor("#FFFFFF"));  // رنگ سفید برای تم روشن
+        }
+    }
+
+    private void getHighScores() {
+        // ایجاد یک نخ پس‌زمینه برای دریافت امتیازات از سرور
+        new Thread(() -> {
+            try {
+                // URL سرور برای دریافت داده‌ها
+                URL url = new URL("https://b.mrbackend.ir/top_users.php");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setConnectTimeout(5000);  // زمان تایم‌اوت اتصال
+                conn.setReadTimeout(5000);     // زمان تایم‌اوت خواندن داده‌ها
+                conn.setRequestMethod("GET");  // استفاده از متد GET برای درخواست از سرور
+
+                int responseCode = conn.getResponseCode();  // دریافت کد پاسخ از سرور
+                if (responseCode != 200) {
+                    throw new Exception("Server error: " + responseCode);  // در صورت بروز خطا در سرور، استثنا پرتاب می‌شود
+                }
+
+                // خواندن پاسخ از سرور
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder result = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    result.append(line);  // اضافه کردن هر خط به نتیجه
+                }
+                reader.close();  // بستن خواننده بعد از اتمام
+
+                // تجزیه پاسخ به فرمت JSON
+                JSONArray usersArray = new JSONArray(result.toString());
+
+                runOnUiThread(() -> {
+                    // پاک کردن ویوهای موجود از لیست امتیازات
+                    scoreListLayout.removeAllViews();
+
+                    // اگر داده‌ای دریافت نشده باشد، نمایش پیغام "بدون رکورد"
+                    if (usersArray.length() == 0) {
+                        TextView emptyText = new TextView(this);
+                        emptyText.setText("No records found!");  // پیغام "بدون رکورد"
+                        emptyText.setTextSize(18);
+                        emptyText.setGravity(Gravity.CENTER);
+                        scoreListLayout.addView(emptyText);  // افزودن پیام به لیست امتیازات
+                        return;
+                    }
+
+                    // حلقه برای نمایش رکوردهای امتیازات
+                    for (int i = 0; i < usersArray.length(); i++) {
+                        try {
+                            JSONObject user = usersArray.getJSONObject(i);  // گرفتن هر رکورد کاربر
+                            String name = user.getString("name");  // دریافت نام
+                            String surname = user.getString("surname");  // دریافت نام خانوادگی
+                            int score = user.optInt("score", 0);  // دریافت امتیاز (اگر موجود نباشد، مقدار پیش‌فرض 0 است)
+
+                            // تبدیل نام و نام خانوادگی بر اساس زبان برنامه
+                            String currentLang = LocaleManager.getLanguage(this);
+                            name = convertNameToLocal(name, currentLang);
+                            surname = convertNameToLocal(surname, currentLang);
+
+                            // ایجاد TextView برای نمایش هر رکورد امتیاز
+                            TextView textView = new TextView(this);
+                            textView.setText((i + 1) + ". " + name + " " + surname + " - " + (currentLang.equals("fa") ? "Score" : "Score") + ": " + score);
+                            textView.setTextSize(18);
+                            textView.setGravity(Gravity.CENTER);
+                            textView.setPadding(16, 8, 16, 8);
+
+                            // تغییر رنگ متن برای رتبه‌ها
+                            if (i == 0) {
+                                textView.setTextColor(Color.parseColor("#FFD700"));  // طلایی برای رتبه اول
+                            } else if (i == 1) {
+                                textView.setTextColor(Color.parseColor("#C0C0C0"));  // نقره‌ای برای رتبه دوم
+                            } else if (i == 2) {
+                                textView.setTextColor(Color.parseColor("#CD7F32"));  // برنزی برای رتبه سوم
+                            } else {
+                                textView.setTextColor(getResources().getColor(android.R.color.black));  // رنگ سیاه برای سایر رتبه‌ها
+                            }
+
+                            // تنظیم پارامترهای لایه و افزودن به لایه
+                            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.WRAP_CONTENT
+                            );
+                            params.setMargins(8, 8, 8, 8);
+                            textView.setLayoutParams(params);
+
+                            scoreListLayout.addView(textView);  // افزودن TextView به لایه نمایش
+                        } catch (Exception e) {
+                            e.printStackTrace();  // چاپ خطا در صورت بروز مشکل
+                        }
+                    }
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Server connection error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        }).start();
+    }
+
+    // متد برای تبدیل نام‌ها به زبان محلی
+    private String convertNameToLocal(String text, String currentLang) {
+        // فرض بر این است که نام‌ها در هر دو زبان یکسان هستند، اما ترجمه می‌تواند در اینجا اضافه شود
+        return text;
+    }
+
+    // مدیریت انتخاب آیتم‌های منو در ناوبری
+    private boolean handleNavigation(MenuItem item) {
+        int itemId = item.getItemId();
+        Intent intent = null;
+
+        if (itemId == R.id.nav_register) {
+            intent = new Intent(TopScoresActivity.this, MainActivity.class);  // صفحه ثبت‌نام
+        } else if (itemId == R.id.nav_login) {
+            intent = new Intent(TopScoresActivity.this, LoginActivity.class);  // صفحه ورود
+        } else if (itemId == R.id.nav_settings) {
+            intent = new Intent(TopScoresActivity.this, SettingsActivity.class);  // صفحه تنظیمات
+        } else if (itemId == R.id.nav_logout) {
+            finishAffinity();  // بستن تمامی اکتیویتی‌ها و خروج از برنامه
+            return true;
+        }
+
+        if (intent != null) {
+            startActivity(intent);  // شروع اکتیویتی جدید
+        }
+
+        // از بین بردن انتخاب آیتم‌ها پس از مدت کوتاه
+        new Handler().postDelayed(() -> {
+            for (int i = 0; i < navigationView.getMenu().size(); i++) {
+                navigationView.getMenu().getItem(i).setChecked(false);  // از بین بردن انتخاب آیتم‌ها
+            }
+        }, 300);
+
+        drawerLayout.closeDrawer(GravityCompat.END);  // بستن منو کشویی
+        return true;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // بررسی تغییر زبان و بازسازی اکتیویتی در صورت تغییر
+        String currentLang = LocaleManager.getLanguage(this);
+        if (!currentLang.equals(lastLanguage)) {
+            lastLanguage = currentLang;
+            recreate();
+        }
+    }
+}

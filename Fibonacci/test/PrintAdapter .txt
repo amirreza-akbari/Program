@@ -1,0 +1,128 @@
+package com.example.healthcheckapp; // تعریف پکیج مربوط به این کلاس
+
+import android.content.Context; // ایمپورت کلاس Context برای دسترسی به منابع و سرویس‌های اپلیکیشن
+import android.graphics.Bitmap; // ایمپورت کلاس Bitmap برای مدیریت تصاویر
+import android.graphics.Canvas; // ایمپورت کلاس Canvas برای کشیدن محتوا روی صفحه
+import android.graphics.Paint; // ایمپورت کلاس Paint برای تنظیمات رنگ و استایل در طراحی گرافیکی
+import android.graphics.pdf.PdfDocument; // ایمپورت PdfDocument برای ایجاد و مدیریت فایل‌های PDF
+import android.os.Bundle; // ایمپورت Bundle برای انتقال داده‌ها بین اکتیویتی‌ها
+import android.os.CancellationSignal; // ایمپورت CancellationSignal برای لغو عملیات پرینت در صورت نیاز
+import android.os.ParcelFileDescriptor; // ایمپورت ParcelFileDescriptor برای دسترسی به فایل خروجی پرینت
+import android.print.PageRange; // ایمپورت PageRange برای مشخص کردن صفحات موردنظر برای چاپ
+import android.print.PrintAttributes; // ایمپورت PrintAttributes برای تنظیم ویژگی‌های چاپ مانند اندازه و کیفیت
+import android.print.PrintDocumentAdapter; // ایمپورت PrintDocumentAdapter برای مدیریت فرآیند چاپ
+import android.print.PrintDocumentInfo; // ایمپورت PrintDocumentInfo برای اطلاعات مربوط به سند پرینت شده
+import android.print.PrintManager; // ایمپورت PrintManager برای کنترل عملیات پرینت
+import android.view.View; // ایمپورت View برای دسترسی به نمای موردنظر جهت چاپ
+import android.widget.ImageView; // ایمپورت ImageView (در این کد استفاده نشده)
+import java.io.FileOutputStream; // ایمپورت FileOutputStream برای نوشتن داده‌ها در فایل خروجی
+import java.io.IOException; // ایمپورت IOException برای مدیریت خطاهای ورودی/خروجی
+
+public class PrintAdapter { // تعریف کلاس PrintAdapter که شامل متدهای موردنیاز برای عملیات چاپ است
+
+    // کلاس داخلی MyPrintAdapter که از PrintDocumentAdapter ارث‌بری کرده و عملیات چاپ را مدیریت می‌کند
+    public static class MyPrintAdapter extends PrintDocumentAdapter {
+        private final Context context; // متغیر برای ذخیره کانتکست برنامه
+        private final View view; // متغیر برای ذخیره نمایی که باید پرینت شود
+        private PdfDocument pdfDocument; // متغیر برای ایجاد و مدیریت سند PDF
+        private static final int PAGE_WIDTH = 2480; // عرض صفحه PDF بر حسب پیکسل
+        private static final int PAGE_HEIGHT = 3508; // ارتفاع صفحه PDF بر حسب پیکسل
+
+        // سازنده کلاس برای مقداردهی اولیه کانتکست و نمای ورودی
+        public MyPrintAdapter(Context context, View view) {
+            this.context = context;
+            this.view = view;
+        }
+
+        @Override
+        public void onLayout(PrintAttributes oldAttributes, PrintAttributes newAttributes,
+                             CancellationSignal cancellationSignal, LayoutResultCallback callback,
+                             Bundle extras) {
+
+            // ایجاد یک نمونه جدید از PdfDocument هنگام درخواست Layout
+            pdfDocument = new PdfDocument();
+
+            // تنظیم اطلاعات مربوط به سند پرینت شده (یک صفحه‌ای)
+            PrintDocumentInfo info = new PrintDocumentInfo.Builder("full_screen_output.pdf")
+                    .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT) // تعیین نوع سند به‌عنوان یک سند متنی
+                    .setPageCount(1) // تعیین تعداد صفحات (یک صفحه)
+                    .build();
+
+            // اعلام اتمام فرآیند layout به سیستم پرینت
+            callback.onLayoutFinished(info, true);
+        }
+
+        @Override
+        public void onWrite(PageRange[] pages, ParcelFileDescriptor destination,
+                            CancellationSignal cancellationSignal, WriteResultCallback callback) {
+
+            // گرفتن نمای موردنظر و تبدیل آن به تصویر Bitmap
+            Bitmap bitmap = getBitmapFromView(view);
+            if (bitmap == null) {
+                // اگر عملیات گرفتن Bitmap ناموفق باشد، عملیات نوشتن پرینت را ناموفق اعلام می‌کنیم
+                callback.onWriteFailed("Error capturing bitmap");
+                return;
+            }
+
+            // تغییر اندازه تصویر گرفته‌شده برای متناسب شدن با صفحه PDF
+            Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, PAGE_WIDTH, PAGE_HEIGHT, true);
+
+            // تنظیم اطلاعات صفحه در سند PDF
+            PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, 1).create();
+            PdfDocument.Page page = pdfDocument.startPage(pageInfo);
+
+            // دریافت Canvas برای کشیدن محتوا روی صفحه PDF
+            Canvas canvas = page.getCanvas();
+            Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG | Paint.ANTI_ALIAS_FLAG);
+
+            // محاسبه ضریب مقیاس برای متناسب‌سازی تصویر در صفحه PDF
+            float scaleX = (float) PAGE_WIDTH / bitmap.getWidth();
+            float scaleY = (float) PAGE_HEIGHT / bitmap.getHeight();
+            float scale = Math.min(scaleX, scaleY);
+            float offsetX = (PAGE_WIDTH - bitmap.getWidth() * scale) / 2;
+            float offsetY = (PAGE_HEIGHT - bitmap.getHeight() * scale) / 2;
+
+            // اعمال مقیاس و کشیدن تصویر روی Canvas
+            canvas.scale(scale, scale);
+            canvas.drawBitmap(bitmap, offsetX / scale, offsetY / scale, paint);
+
+            // اتمام فرآیند رسم صفحه در PDF
+            pdfDocument.finishPage(page);
+
+            try (FileOutputStream out = new FileOutputStream(destination.getFileDescriptor())) {
+                // نوشتن سند PDF در مسیر خروجی تعیین شده
+                pdfDocument.writeTo(out);
+            } catch (IOException e) {
+                e.printStackTrace(); // ثبت خطا در صورت بروز مشکل در نوشتن فایل
+            } finally {
+                // بستن PdfDocument برای آزادسازی منابع
+                pdfDocument.close();
+            }
+
+            // اعلام موفقیت‌آمیز بودن عملیات نوشتن به سیستم پرینت
+            callback.onWriteFinished(new PageRange[]{PageRange.ALL_PAGES});
+        }
+    }
+
+    // متد استاتیک برای شروع فرآیند چاپ
+    public static void printDocument(Context context, View view) {
+        // دریافت سرویس PrintManager از سیستم
+        PrintManager printManager = (PrintManager) context.getSystemService(Context.PRINT_SERVICE);
+
+        // تعیین نام برای کار پرینت
+        String jobName = "FullScreen_Print";
+
+        // شروع عملیات پرینت با استفاده از PrintDocumentAdapter سفارشی‌شده
+        printManager.print(jobName, new MyPrintAdapter(context, view), new PrintAttributes.Builder().build());
+    }
+
+    // متد کمکی برای گرفتن تصویر Bitmap از نمای ورودی
+    private static Bitmap getBitmapFromView(View view) {
+        // فعال‌سازی کش برای گرفتن محتویات View
+        view.setDrawingCacheEnabled(true);
+        view.buildDrawingCache();
+        Bitmap bitmap = Bitmap.createBitmap(view.getDrawingCache());
+        view.setDrawingCacheEnabled(false); // غیرفعال کردن کش بعد از گرفتن تصویر
+        return bitmap;
+    }
+}

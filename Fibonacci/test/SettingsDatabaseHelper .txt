@@ -1,0 +1,31 @@
+package com.example.healthcheckapp;
+
+import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+
+public class SettingsDatabaseHelper extends SQLiteOpenHelper {
+    // نام پایگاه داده و نسخه آن
+    private static final String DATABASE_NAME = "settings.db";
+    private static final int DATABASE_VERSION = 1;
+
+    // سازنده کلاس برای مقداردهی اولیه به دیتابیس هِلپر
+    public SettingsDatabaseHelper(Context context) {
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);  // فراخوانی سازنده کلاس والد (SQLiteOpenHelper)
+    }
+
+    // متدی که زمانی که دیتابیس برای اولین بار ساخته می‌شود، جدول‌های لازم را ایجاد می‌کند
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        // ایجاد جدول 'settings' با ستون‌های 'id' (کلید اصلی) و 'theme' (برای ذخیره تنظیمات تم)
+        db.execSQL("CREATE TABLE settings (id INTEGER PRIMARY KEY, theme TEXT)");
+    }
+
+    // متدی که زمانی که نسخه دیتابیس تغییر می‌کند، برای به‌روزرسانی دیتابیس فراخوانی می‌شود
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        // حذف جدول 'settings' اگر وجود داشته باشد و سپس دوباره آن را ایجاد می‌کنیم
+        db.execSQL("DROP TABLE IF EXISTS settings");
+        onCreate(db);  // فراخوانی متد onCreate برای ایجاد دوباره جدول‌ها
+    }
+}

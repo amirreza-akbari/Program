@@ -1,0 +1,134 @@
+package com.example.healthcheckapp;
+
+import android.content.Intent;
+import android.print.PrintAttributes;
+import android.os.Bundle;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
+import android.widget.Button;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+import com.example.healthcheckapp.utils.LocaleManager;
+import com.example.healthcheckapp.utils.ThemeManager;
+import androidx.cardview.widget.CardView;
+import android.graphics.Color;
+
+public class ResultActivity extends AppCompatActivity {
+
+    private TextView tvResult;
+    private Button btnBackToMain, btnExit, btnPrint;
+    private static String lastLanguage = null;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        // ابتدا تم (ظاهر) اپلیکیشن بر اساس حالت تیره یا روشن تنظیم می‌شود
+        if (ThemeManager.isDarkMode(this)) {
+            setTheme(R.style.Theme_MyApp_Dark);  // اگر حالت تیره است، تم تیره انتخاب می‌شود
+        } else {
+            setTheme(R.style.Theme_MyApp_Light);  // اگر حالت روشن است، تم روشن انتخاب می‌شود
+        }
+
+        // بررسی زبان فعلی و تنظیم زبان اپلیکیشن
+        String currentLang = LocaleManager.getLanguage(this);
+        if (lastLanguage == null) {
+            lastLanguage = currentLang;  // در صورتی که زبان قبلی ذخیره نشده باشد، زبان فعلی را ذخیره می‌کنیم
+        }
+        LocaleManager.setLocale(this, currentLang);  // زبان اپلیکیشن را با توجه به زبان فعلی تنظیم می‌کنیم
+
+        // پنهان کردن ActionBar برای ایجاد ظاهری تمیزتر
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
+
+        // ایجاد UI بعد از اجرای setLocale
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_result);  // بارگذاری layout صفحه نتایج
+
+        // گرفتن CardView برای استایل‌دهی
+        CardView cardView = findViewById(R.id.cardView);
+
+        // تنظیم رنگ پس‌زمینه CardView با توجه به تم (حالت تیره یا روشن)
+        if (ThemeManager.isDarkMode(this)) {
+            cardView.setCardBackgroundColor(Color.parseColor("#0f4b6f"));  // رنگ پس‌زمینه آبی تیره در حالت تیره
+        } else {
+            cardView.setCardBackgroundColor(Color.parseColor("#FFFFFF"));  // رنگ پس‌زمینه سفید در حالت روشن
+        }
+
+        // مقداردهی به کامپوننت‌های UI
+        tvResult = findViewById(R.id.tvResult);
+        btnBackToMain = findViewById(R.id.btnBackToMain);
+        btnExit = findViewById(R.id.btnExit);
+        btnPrint = findViewById(R.id.btnPrint);  // دکمه چاپ
+
+        // دریافت داده‌های کاربر از Intent
+        String name = getIntent().getStringExtra("name");
+        String surname = getIntent().getStringExtra("surname");
+        String email = getIntent().getStringExtra("email");
+        int score = getIntent().getIntExtra("totalScore", 0);  // امتیاز کاربر
+
+        // تعیین وضعیت پیام براساس امتیاز و زبان
+        String status;
+        if (score < 10) {
+            status = currentLang.equals("fa") ? "⚠️ وضعیت: اطلاعات شما نیاز به بهبود دارد." : "⚠️ Status: Your information needs improvement.";
+        } else if (score <= 15) {
+            status = currentLang.equals("fa") ? "✅ وضعیت: خوب، می‌توانید بهتر شوید." : "✅ Status: Good, but you can improve.";
+        } else if (score < 20) {
+            status = currentLang.equals("fa") ? "🌟 وضعیت: خیلی خوب، عالی پیش می‌روید!" : "🌟 Status: Very good, you're doing great!";
+        } else {
+            status = currentLang.equals("fa") ? "🏆 وضعیت: ممتاز، فوق‌العاده‌اید!" : "🏆 Status: Excellent, you are outstanding!";
+        }
+
+        // فرمت‌بندی متن نتیجه بر اساس زبان
+        String result = (currentLang.equals("fa") ? 
+                "نام: " + name + "\n\n" + 
+                "نام خانوادگی: " + surname + "\n\n" +
+                "ایمیل: " + email + "\n\n" +
+                "نمره: " + score + "\n\n" + status :
+                "Name: " + name + "\n\n" + 
+                "Surname: " + surname + "\n\n" +
+                "Email: " + email + "\n\n" +
+                "Score: " + score + "\n\n" + status);
+
+        // تنظیم متن نتیجه در TextView
+        tvResult.setText(result);
+
+        // تنظیم متن دکمه‌ها براساس زبان فعلی
+        btnBackToMain.setText(currentLang.equals("fa") ? "بازگشت به صفحه اصلی" : "Back to Main");
+        btnExit.setText(currentLang.equals("fa") ? "خروج" : "Exit");
+        btnPrint.setText(currentLang.equals("fa") ? "چاپ نتیجه" : "Print Result");
+
+        // تنظیم عملکرد دکمه بازگشت به صفحه اصلی
+        btnBackToMain.setOnClickListener(v -> {
+            Intent intent = new Intent(ResultActivity.this, TopScoresActivity.class);
+            startActivity(intent);
+            finish();
+        });
+
+        // تنظیم عملکرد دکمه خروج
+        btnExit.setOnClickListener(v -> finishAffinity());
+
+        // تنظیم عملکرد دکمه چاپ
+        btnPrint.setOnClickListener(v -> printResult());
+    }
+
+    // تابع برای چاپ نتیجه
+    private void printResult() {
+        PrintManager printManager = (PrintManager) getSystemService(PRINT_SERVICE);
+        if (printManager != null) {
+            // در اینجا از یک چاپگر مستند برای چاپ استفاده می‌کنیم
+            PrintDocumentAdapter printAdapter = new PrintDocumentAdapter();
+            printAdapter.printDocument(this, findViewById(R.id.tvResult));  // چاپ متن موجود در TextView
+        }
+    }
+
+    // بازسازی Activity در صورتی که زبان تغییر کرده باشد
+    @Override
+    protected void onResume() {
+        super.onResume();
+        String currentLang = LocaleManager.getLanguage(this);
+        if (!currentLang.equals(lastLanguage)) {
+            lastLanguage = currentLang;
+            recreate();  // صفحه دوباره ساخته می‌شود
+        }
+    }
+}

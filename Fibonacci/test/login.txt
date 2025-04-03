@@ -1,0 +1,229 @@
+package com.example.healthcheckapp;
+
+import android.content.Intent;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.cardview.widget.CardView;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
+
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+import com.example.healthcheckapp.utils.LocaleManager;
+import com.example.healthcheckapp.utils.ThemeManager;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.textfield.TextInputEditText;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import android.os.Handler;
+import android.os.Looper;
+
+public class LoginActivity extends AppCompatActivity {
+
+    // متغیرها برای استفاده در اجزای مختلف Activity
+    private DrawerLayout drawerLayout;
+    private NavigationView navigationView;
+    private TextInputEditText etEmail, etPassword;
+    private MaterialButton btnLogin;
+    private static String lastLanguage = null; // ذخیره زبان قبلی برای استفاده مجدد
+
+    // پیام‌ها بر اساس زبان انتخاب شده
+    private String wait, emptyFieldsMessage, invalidEmailMessage, saveSuccessMessage, saveErrorMessage, serverErrorMessage;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        // تنظیم تم بر اساس حالت تاریک یا روشن
+        if (ThemeManager.isDarkMode(this)) {
+            setTheme(R.style.Theme_MyApp_Dark); // انتخاب تم تاریک
+        } else {
+            setTheme(R.style.Theme_MyApp_Light); // انتخاب تم روشن
+        }
+
+        // دریافت زبان فعلی و تنظیم آن
+        String currentLang = LocaleManager.getLanguage(this);
+        if (lastLanguage == null) {
+            lastLanguage = currentLang; // ذخیره زبان قبلی
+        }
+        LocaleManager.setLocale(this, currentLang); // تنظیم زبان برنامه
+        setMessagesBasedOnLanguage(currentLang); // تنظیم پیام‌ها بر اساس زبان
+
+        // مخفی کردن action bar
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
+
+        // تنظیم layout برای Activity
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_login);
+
+        // گرفتن دسترسی به کارت (CardView) برای تغییر رنگ
+        CardView cardView = findViewById(R.id.cardView);
+
+        // تنظیم رنگ پس‌زمینه کارت بر اساس تم
+        if (ThemeManager.isDarkMode(this)) {
+            cardView.setCardBackgroundColor(Color.parseColor("#0f4b6f")); // رنگ تم تاریک
+        } else {
+            cardView.setCardBackgroundColor(Color.parseColor("#FFFFFF")); // رنگ تم روشن
+        }
+
+        // مقداردهی به متغیرهای ورودی و دکمه‌ها
+        etEmail = findViewById(R.id.etEmail); // دریافت ورودی ایمیل
+        etPassword = findViewById(R.id.etPassword); // دریافت ورودی پسورد
+        btnLogin = findViewById(R.id.btnLogin); // دریافت دکمه ورود
+        drawerLayout = findViewById(R.id.drawer_layout); // دریافت layout منوی کشویی
+        navigationView = findViewById(R.id.navigation_view); // دریافت منوی ناوبری
+
+        // تنظیم دکمه باز کردن منو کشویی
+        findViewById(R.id.btnOpenMenu).setOnClickListener(v -> drawerLayout.openDrawer(GravityCompat.END));
+
+        // مدیریت انتخاب آیتم‌های منو
+        navigationView.setNavigationItemSelectedListener(this::handleNavigation);
+
+        // مخفی کردن گزینه ورود در منوی ناوبری
+        Menu menu = navigationView.getMenu();
+        menu.findItem(R.id.nav_login).setVisible(false);
+
+        // تنظیم عملکرد دکمه ورود
+        btnLogin.setOnClickListener(v -> {
+            String email = etEmail.getText().toString().trim(); // دریافت ایمیل
+            String password = etPassword.getText().toString().trim(); // دریافت پسورد
+
+            // بررسی پر بودن فیلدها
+            if (email.isEmpty() || password.isEmpty()) {
+                // نمایش پیام خطا در صورت خالی بودن فیلدها
+                Toast.makeText(LoginActivity.this, emptyFieldsMessage, Toast.LENGTH_SHORT).show();
+            } else {
+                // فراخوانی متد ورود به سیستم در صورت پر بودن فیلدها
+                loginUser(email, password);
+            }
+        });
+    }
+
+    // متد ورود به سیستم
+    private void loginUser(String email, String password) {
+        String url = "https://b.mrbackend.ir/login.php"; // آدرس API برای ورود
+
+        // ارسال درخواست به سرور
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, url,
+                response -> {
+                    try {
+                        Log.d("LoginResponse", response); // چاپ پاسخ سرور در لاگ
+
+                        // تجزیه پاسخ JSON از سرور
+                        JSONObject jsonResponse = new JSONObject(response);
+                        String status = jsonResponse.getString("status");
+                        String message = jsonResponse.getString("message");
+
+                        // در صورت موفقیت در ورود
+                        if (status.equals("success")) {
+                            String name = jsonResponse.getString("name");
+                            String surname = jsonResponse.getString("surname");
+                            String userEmail = jsonResponse.getString("email");
+                            String score = jsonResponse.getString("score");
+
+                            // نمایش پیام موفقیت
+                            Toast.makeText(LoginActivity.this, saveSuccessMessage, Toast.LENGTH_SHORT).show();
+
+                            // انتقال به صفحه نتیجه‌گیری با داده‌های کاربر
+                            Intent intent = new Intent(LoginActivity.this, ResultActivity.class);
+                            intent.putExtra("name", name);
+                            intent.putExtra("surname", surname);
+                            intent.putExtra("email", userEmail);
+                            intent.putExtra("score", score);
+                            startActivity(intent); // شروع Activity بعدی
+                        } else {
+                            // نمایش پیام خطا در صورت ناموفق بودن ورود
+                            Toast.makeText(LoginActivity.this, message, Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                        // نمایش پیام خطا در صورت وجود مشکل در تجزیه پاسخ
+                        Toast.makeText(LoginActivity.this, serverErrorMessage, Toast.LENGTH_SHORT).show();
+                    }
+                },
+                error -> Toast.makeText(LoginActivity.this, serverErrorMessage, Toast.LENGTH_SHORT).show()
+        ) {
+            // اضافه کردن پارامترهای درخواست POST
+            @Override
+            protected Map<String, String> getParams() {
+                Map<String, String> params = new HashMap<>();
+                params.put("email", email); // ارسال ایمیل
+                params.put("password", password); // ارسال پسورد
+                return params;
+            }
+        };
+
+        // اضافه کردن درخواست به صف درخواست‌ها
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+        requestQueue.add(stringRequest);
+    }
+
+    // متد مدیریت انتخاب آیتم‌های منوی ناوبری
+    private boolean handleNavigation(MenuItem item) {
+        int itemId = item.getItemId();
+        Intent intent = null;
+
+        // انتقال به فعالیت‌های مختلف بر اساس انتخاب آیتم منو
+        if (itemId == R.id.nav_home) {
+            intent = new Intent(LoginActivity.this, TopScoresActivity.class); // صفحه امتیازات برتر
+        } else if (itemId == R.id.nav_register) {
+            intent = new Intent(LoginActivity.this, MainActivity.class); // صفحه ثبت‌نام
+        } else if (itemId == R.id.nav_settings) {
+            intent = new Intent(LoginActivity.this, SettingsActivity.class); // صفحه تنظیمات
+        } else if (itemId == R.id.nav_logout) {
+            finishAffinity();  // بستن تمام فعالیت‌ها و خروج از برنامه
+            return true;
+        }
+
+        // شروع فعالیت انتخاب‌شده
+        if (intent != null) {
+            startActivity(intent);
+        }
+
+        // غیرفعال کردن تمام آیتم‌های منو پس از مدت کوتاهی برای بهبود تجربه کاربری
+        new Handler().postDelayed(() -> {
+            for (int i = 0; i < navigationView.getMenu().size(); i++) {
+                navigationView.getMenu().getItem(i).setChecked(false);
+            }
+        }, 300);
+
+        // بستن منوی ناوبری
+        drawerLayout.closeDrawer(GravityCompat.END);
+        return true;
+    }
+
+    // متد تنظیم پیام‌ها بر اساس زبان انتخاب‌شده
+    private void setMessagesBasedOnLanguage(String language) {
+        if (language.equals("fa")) { // زبان فارسی
+            wait = "لطفا صبرکنید...";
+            emptyFieldsMessage = "لطفا تمام فیلدها را پر کنید";
+            invalidEmailMessage = "ایمیل وارد شده معتبر نیست";
+            saveSuccessMessage = "اطلاعات با موفقیت ذخیره شد.";
+            saveErrorMessage = "خطا: ایمیل تکراری است.";
+            serverErrorMessage = "خطا در اتصال به سرور";
+        } else { // زبان انگلیسی
+            wait = "Please wait...";
+            emptyFieldsMessage = "Please fill out all fields";
+            invalidEmailMessage = "The entered email is invalid";
+            saveSuccessMessage = "Data saved successfully.";
+            saveErrorMessage = "Error: Email is already taken.";
+            serverErrorMessage = "Error connecting to the server";
+        }
+    }
+}

@@ -1,0 +1,242 @@
+package com.example.healthcheckapp;
+
+// وارد کردن کتابخانه‌های لازم برای انجام عملیات مختلف
+import android.app.ProgressDialog; // برای نمایش دیالوگ بارگذاری
+import android.content.Intent; // برای ایجاد و انتقال به فعالیت‌های دیگر
+import android.os.Bundle; // برای مدیریت داده‌ها در فعالیت‌ها
+import android.view.Menu; // برای مدیریت منوها
+import android.view.MenuItem; // برای مدیریت انتخاب آیتم‌ها
+import android.widget.Toast; // برای نمایش پیام‌های کوتاه به کاربر
+
+import androidx.appcompat.app.AppCompatActivity; // برای ایجاد فعالیت‌های اپلیکیشن
+import androidx.core.view.GravityCompat; // برای مدیریت کشویی منو
+import androidx.drawerlayout.widget.DrawerLayout; // برای طراحی منو کشویی
+
+import com.android.volley.Request; // برای ارسال درخواست HTTP
+import com.android.volley.RequestQueue; // برای مدیریت صف درخواست‌ها
+import com.android.volley.toolbox.StringRequest; // برای درخواست‌هایی که تنها رشته‌ای از سرور دریافت می‌کنند
+import com.android.volley.toolbox.Volley; // برای راه‌اندازی Volley
+import com.google.android.material.button.MaterialButton; // برای دکمه‌های طراحی شده با متریال دیزاین
+import com.google.android.material.navigation.NavigationView; // برای منو ناوبری
+import com.google.android.material.textfield.TextInputEditText; // برای ورودی‌های متنی طراحی شده با متریال دیزاین
+
+import org.json.JSONException; // برای مدیریت خطاها در تجزیه JSON
+import org.json.JSONObject; // برای ساخت و تجزیه داده‌های JSON
+
+import java.util.HashMap; // برای ذخیره داده‌ها به صورت کلید-مقدار
+import java.util.Map; // برای استفاده از ساختار داده‌های کلید-مقدار
+
+import com.example.healthcheckapp.utils.LocaleManager; // برای مدیریت زبان
+import com.example.healthcheckapp.utils.ThemeManager; // برای مدیریت تم‌های تاریک و روشن
+
+import android.os.Handler; // برای مدیریت عملیات زمان‌بندی شده
+import android.os.Looper; // برای مدیریت عملیات در نخ UI
+
+import androidx.cardview.widget.CardView; // برای طراحی کارت ویو
+import android.graphics.Color; // برای تنظیم رنگ‌ها
+
+public class MainActivity extends AppCompatActivity {
+    // تعاریف متغیرها
+    private DrawerLayout drawerLayout; // برای طراحی منو کشویی
+    private NavigationView navigationView; // برای طراحی منوی ناوبری
+    private TextInputEditText etName, etSurname, etEmail, etPassword; // فیلدهای ورودی برای نام، نام خانوادگی، ایمیل و رمز عبور
+    private MaterialButton btnNext; // دکمه "بعدی"
+    private ProgressDialog progressDialog; // دیالوگ بارگذاری برای نمایش فرآیندهای طولانی
+    private static String lastLanguage = null; // برای ذخیره زبان آخرین انتخاب شده
+
+    // پیام‌های مختلف برای زبان‌های مختلف
+    private String emptyFieldsMessage, invalidEmailMessage, saveSuccessMessage, saveErrorMessage, serverErrorMessage , wait;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        // تنظیم تم براساس حالت تاریک یا روشن
+        if (ThemeManager.isDarkMode(this)) {
+            setTheme(R.style.Theme_MyApp_Dark); // تنظیم تم تاریک
+        } else {
+            setTheme(R.style.Theme_MyApp_Light); // تنظیم تم روشن
+        }
+
+        // تنظیم زبان برنامه بر اساس تنظیمات زبان قبلی
+        String currentLang = LocaleManager.getLanguage(this); // گرفتن زبان فعلی
+        if (lastLanguage == null) {
+            lastLanguage = currentLang; // ذخیره زبان برای مقایسه
+        }
+        LocaleManager.setLocale(this, currentLang); // تنظیم زبان برنامه
+
+        // تنظیم پیام‌ها بر اساس زبان انتخابی
+        setMessagesBasedOnLanguage(currentLang);
+
+        // مخفی کردن نوار عنوان در بالای صفحه
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
+
+        super.onCreate(savedInstanceState); // فراخوانی متد پدر برای راه‌اندازی فعالیت
+        setContentView(R.layout.activity_main); // تنظیم محتوای صفحه اصلی
+
+        CardView cardView = findViewById(R.id.cardView); // پیدا کردن کارت ویو
+
+        // تنظیم رنگ پس‌زمینه کارت ویو براساس تم انتخابی
+        if (ThemeManager.isDarkMode(this)) {
+            cardView.setCardBackgroundColor(Color.parseColor("#0f4b6f")); // رنگ پس‌زمینه برای تم تاریک
+        } else {
+            cardView.setCardBackgroundColor(Color.parseColor("#FFFFFF")); // رنگ پس‌زمینه برای تم روشن
+        }
+
+        initViews(); // فراخوانی متد برای اینیشیالایز کردن ویوها
+
+        // باز کردن منو کشویی هنگام کلیک روی دکمه
+        findViewById(R.id.btnOpenMenu).setOnClickListener(v -> drawerLayout.openDrawer(GravityCompat.END));
+
+        // تنظیم لیسنر برای انتخاب آیتم‌های منو
+        navigationView.setNavigationItemSelectedListener(this::handleNavigation);
+
+        // مدیریت کلیک روی دکمه "بعدی" برای اعتبارسنجی و ذخیره داده‌ها
+        btnNext.setOnClickListener(v -> validateAndSaveData());
+        
+        // مخفی کردن آیتم "ثبت‌نام" در منو
+        Menu menu = navigationView.getMenu();
+        menu.findItem(R.id.nav_register).setVisible(false);
+    }
+
+    // تنظیم پیام‌ها بر اساس زبان انتخابی
+    private void setMessagesBasedOnLanguage(String language) {
+        if (language.equals("fa")) {
+            wait = "لطفا صبرکنید...";
+            emptyFieldsMessage = "لطفا تمام فیلدها را پر کنید";
+            invalidEmailMessage = "ایمیل وارد شده معتبر نیست";
+            saveSuccessMessage = "اطلاعات با موفقیت ذخیره شد.";
+            saveErrorMessage = "خطا: ایمیل تکراری است.";
+            serverErrorMessage = "خطا در اتصال به سرور";
+        } else {
+            wait = "Please wait...";
+            emptyFieldsMessage = "Please fill out all fields";
+            invalidEmailMessage = "The entered email is invalid";
+            saveSuccessMessage = "Data saved successfully.";
+            saveErrorMessage = "Error: Email is already taken.";
+            serverErrorMessage = "Error connecting to the server";
+        }
+    }
+
+    // اینیشیالایز کردن ویوها و کامپوننت‌ها
+    private void initViews() {
+        drawerLayout = findViewById(R.id.drawer_layout); // پیدا کردن منو کشویی
+        navigationView = findViewById(R.id.navigation_view); // پیدا کردن ویو ناوبری
+        etName = findViewById(R.id.etName); // پیدا کردن فیلد ورودی نام
+        etSurname = findViewById(R.id.etSurname); // پیدا کردن فیلد ورودی نام خانوادگی
+        etEmail = findViewById(R.id.etEmail); // پیدا کردن فیلد ورودی ایمیل
+        etPassword = findViewById(R.id.etPassword); // پیدا کردن فیلد ورودی رمز عبور
+        btnNext = findViewById(R.id.btnNext); // پیدا کردن دکمه "بعدی"
+
+        progressDialog = new ProgressDialog(this); // ساخت دیالوگ بارگذاری
+        progressDialog.setMessage(wait); // تنظیم پیام برای دیالوگ بارگذاری
+        progressDialog.setCancelable(false); // غیرقابل لغو بودن دیالوگ
+    }
+
+    // مدیریت انتخاب آیتم‌های منو
+    private boolean handleNavigation(MenuItem item) {
+        int itemId = item.getItemId(); // گرفتن آیتم انتخابی منو
+        Intent intent = null;
+
+        if (itemId == R.id.nav_home) {
+            intent = new Intent(MainActivity.this, TopScoresActivity.class); // انتقال به صفحه امتیازات
+        } else if (itemId == R.id.nav_login) {
+            intent = new Intent(MainActivity.this, LoginActivity.class); // انتقال به صفحه ورود
+        } else if (itemId == R.id.nav_settings) {
+            intent = new Intent(MainActivity.this, SettingsActivity.class); // انتقال به صفحه تنظیمات
+        } else if (itemId == R.id.nav_logout) {
+            finishAffinity(); // خروج از برنامه
+            return true;
+        }
+
+        if (intent != null) {
+            startActivity(intent); // شروع فعالیت جدید
+        }
+
+        // غیرفعال کردن انتخاب همه آیتم‌های منو بعد از یک مدت کوتاه
+        new Handler().postDelayed(() -> {
+            for (int i = 0; i < navigationView.getMenu().size(); i++) {
+                navigationView.getMenu().getItem(i).setChecked(false);
+            }
+        }, 300);
+
+        drawerLayout.closeDrawer(GravityCompat.END); // بستن منو کشویی
+        return true;
+    }
+
+    // اعتبارسنجی داده‌ها و ذخیره اطلاعات در دیتابیس
+    private void validateAndSaveData() {
+        String name = etName.getText().toString().trim(); // گرفتن نام از فیلد
+        String surname = etSurname.getText().toString().trim(); // گرفتن نام خانوادگی از فیلد
+        String email = etEmail.getText().toString().trim(); // گرفتن ایمیل از فیلد
+        String password = etPassword.getText().toString().trim(); // گرفتن رمز عبور از فیلد
+
+        // بررسی اینکه هیچ فیلدی خالی نباشد
+        if (name.isEmpty() || surname.isEmpty() || email.isEmpty() || password.isEmpty()) {
+            Toast.makeText(this, emptyFieldsMessage, Toast.LENGTH_SHORT).show(); // نمایش پیام خطا در صورت خالی بودن فیلدها
+        }
+        // بررسی معتبر بودن فرمت ایمیل
+        else if (!isValidEmail(email)) {
+            Toast.makeText(this, invalidEmailMessage, Toast.LENGTH_SHORT).show(); // نمایش پیام خطا در صورت معتبر نبودن ایمیل
+        }
+        // ذخیره داده‌ها در دیتابیس اگر اعتبارسنجی موفق بود
+        else {
+            saveDataToDatabase(name, surname, email, password);
+        }
+    }
+
+    // بررسی معتبر بودن فرمت ایمیل
+    private boolean isValidEmail(String email) {
+        String emailPattern = "[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"; // الگوی ایمیل معتبر
+        return email.matches(emailPattern); // مقایسه ایمیل با الگو
+    }
+
+    // ذخیره داده‌ها در دیتابیس از طریق درخواست API
+    private void saveDataToDatabase(String name, String surname, String email, String password) {
+        String url = "https://b.mrbackend.ir/register.php"; // آدرس API برای ثبت‌نام
+        RequestQueue requestQueue = Volley.newRequestQueue(this); // ساخت صف درخواست‌ها
+
+        progressDialog.show(); // نمایش دیالوگ بارگذاری
+
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, url,
+                response -> {
+                    progressDialog.dismiss(); // مخفی کردن دیالوگ بارگذاری پس از دریافت پاسخ
+                    handleServerResponse(response, name, surname, email); // مدیریت پاسخ سرور
+                },
+                error -> {
+                    progressDialog.dismiss(); // مخفی کردن دیالوگ بارگذاری در صورت خطا
+                    Toast.makeText(this, serverErrorMessage, Toast.LENGTH_SHORT).show(); // نمایش پیام خطا در صورت بروز مشکل
+                }) {
+            @Override
+            protected Map<String, String> getParams() {
+                // آماده‌سازی داده‌ها برای ارسال در درخواست POST
+                Map<String, String> params = new HashMap<>();
+                params.put("name", name); // افزودن نام به داده‌های درخواست
+                params.put("surname", surname); // افزودن نام خانوادگی به داده‌های درخواست
+                params.put("email", email); // افزودن ایمیل به داده‌های درخواست
+                params.put("password", password); // افزودن رمز عبور به داده‌های درخواست
+                return params; // بازگرداندن داده‌های درخواست
+            }
+        };
+        requestQueue.add(stringRequest); // ارسال درخواست به صف
+    }
+
+    // مدیریت پاسخ سرور و هدایت به صفحه بعدی
+    private void handleServerResponse(String response, String name, String surname, String email) {
+        try {
+            JSONObject jsonResponse = new JSONObject(response); // تجزیه پاسخ JSON
+            if (jsonResponse.getString("status").equals("success")) { // بررسی وضعیت موفقیت
+                Toast.makeText(this, saveSuccessMessage, Toast.LENGTH_SHORT).show(); // نمایش پیام موفقیت
+                Intent intent = new Intent(this, QuestionsActivity.class); // انتقال به صفحه سوالات
+                intent.putExtra("name", name); // ارسال نام به صفحه بعد
+                intent.putExtra("surname", surname); // ارسال نام خانوادگی به صفحه بعد
+                intent.putExtra("email", email); // ارسال ایمیل به صفحه بعد
+                startActivity(intent); // شروع فعالیت جدید
+            } else {
+                Toast.makeText(this, saveErrorMessage, Toast.LENGTH_SHORT).show(); // نمایش پیام خطا در صورت بروز مشکل در ذخیره داده‌ها
+            }
+        } catch (JSONException e) {
+            Toast.makeText(this, "Error processing response", Toast.LENGTH_SHORT).show(); // نمایش پیام خطا در صورت بروز مشکل در پردازش پاسخ
+        }
+    }
+}

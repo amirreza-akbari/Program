@@ -1,0 +1,105 @@
+package com.example.healthcheckapp; // تعریف پکیج اپلیکیشن
+
+import android.app.NotificationChannel; // وارد کردن کلاس NotificationChannel برای ایجاد کانال نوتیفیکیشن‌ها
+import android.app.NotificationManager; // وارد کردن کلاس NotificationManager برای مدیریت نوتیفیکیشن‌ها
+import android.content.Intent; // وارد کردن کلاس Intent برای جابجایی بین اکتیویتی‌ها
+import android.content.res.Configuration; // وارد کردن کلاس Configuration برای مدیریت تنظیمات پیکربندی
+import android.os.Build; // وارد کردن کلاس Build برای بررسی نسخه اندروید
+import android.os.Bundle; // وارد کردن کلاس Bundle برای مدیریت داده‌ها در فعالیت‌ها
+import android.os.Handler; // وارد کردن کلاس Handler برای انجام کارهای زمان‌بندی شده
+import android.view.animation.Animation; // وارد کردن کلاس Animation برای مدیریت انیمیشن‌ها
+import android.view.animation.AnimationUtils; // وارد کردن کلاس AnimationUtils برای بارگذاری انیمیشن‌ها
+import android.widget.ImageView; // وارد کردن کلاس ImageView برای نمایش تصاویر
+import android.widget.Toast; // وارد کردن کلاس Toast برای نمایش پیام‌های کوتاه
+
+import androidx.appcompat.app.AppCompatActivity; // وارد کردن کلاس AppCompatActivity برای استفاده از اکتیویتی‌ها
+import androidx.core.app.NotificationCompat; // وارد کردن کلاس NotificationCompat برای ساخت نوتیفیکیشن‌ها
+import androidx.core.content.ContextCompat; // وارد کردن کلاس ContextCompat برای بررسی مجوزها
+
+import java.util.Locale; // وارد کردن کلاس Locale برای مدیریت زبان و منطقه
+
+public class SplashActivity extends AppCompatActivity { // تعریف اکتیویتی اسپلش (صفحه خوش‌آمدگویی)
+
+    private static final String CHANNEL_ID = "health_check_notification"; // شناسه کانال نوتیفیکیشن
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) { // متد onCreate که در هنگام ساخت اکتیویتی اجرا می‌شود
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_splash); // تنظیم محتوای صفحه اسپلش
+
+        // ایجاد انیمیشن fade-in برای لوگو
+        ImageView logo = findViewById(R.id.logo); // پیدا کردن ویو لوگو با شناسه
+        Animation fadeIn = AnimationUtils.loadAnimation(this, R.anim.fade_in); // بارگذاری انیمیشن fade-in
+        logo.startAnimation(fadeIn); // شروع انیمیشن fade-in روی لوگو
+
+        // درخواست مجوز نوتیفیکیشن برای اندروید 13 و نسخه‌های بالاتر
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // بررسی نسخه اندروید
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) // بررسی مجوز ارسال نوتیفیکیشن
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) { // اگر مجوز داده نشده باشد
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 1); // درخواست مجوز
+            } else {
+                showNotification(); // اگر مجوز داده شده باشد، نمایش نوتیفیکیشن
+            }
+        } else {
+            // نیازی به درخواست مجوز برای نسخه‌های اندروید پایین‌تر از 13
+            showNotification(); // نمایش نوتیفیکیشن
+        }
+
+        // پس از 3 ثانیه، انتقال به صفحه اصلی (TopScoresActivity)
+        new Handler().postDelayed(() -> {
+            Intent intent = new Intent(SplashActivity.this, TopScoresActivity.class); // ایجاد Intent برای انتقال به اکتیویتی TopScoresActivity
+            startActivity(intent); // شروع اکتیویتی جدید
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out); // اعمال انیمیشن برای انتقال صفحه
+            finish(); // بستن اکتیویتی اسپلش
+        }, 3000); // تأخیر 3 ثانیه‌ای
+    }
+
+    private void showNotification() { // متد نمایش نوتیفیکیشن
+        // دریافت زبان پیش‌فرض دستگاه
+        String language = Locale.getDefault().getLanguage(); // گرفتن زبان پیش‌فرض
+        String title; // عنوان نوتیفیکیشن
+        String message; // پیام نوتیفیکیشن
+
+        // تنظیم عنوان و پیام بر اساس زبان
+        if (language.equals("fa")) { // اگر زبان فارسی باشد
+            title = "خوش آمدید!"; // عنوان فارسی
+            message = "از اینکه از اپلیکیشن ما استفاده می‌کنید، متشکریم."; // پیام فارسی
+        } else {
+            title = "Welcome!"; // عنوان انگلیسی
+            message = "Thank you for using our app."; // پیام انگلیسی
+        }
+
+        // ایجاد کانال نوتیفیکیشن برای اندروید 8 (API 26) و نسخه‌های بالاتر
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { // بررسی نسخه اندروید
+            NotificationChannel channel = new NotificationChannel( // ایجاد کانال نوتیفیکیشن
+                    CHANNEL_ID,
+                    "Health Check Notification", // نام کانال
+                    NotificationManager.IMPORTANCE_HIGH // اهمیت نوتیفیکیشن
+            );
+            channel.setDescription("Notification for Health Check App"); // توضیح کانال
+
+            // ثبت کانال نوتیفیکیشن با سیستم
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel); // ایجاد کانال نوتیفیکیشن
+            }
+        }
+
+        // ایجاد نوتیفیکیشن با آیکون کوچک، عنوان و پیام
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.logo) // آیکون نوتیفیکیشن
+                .setContentTitle(title) // عنوان نوتیفیکیشن
+                .setContentText(message) // پیام نوتیفیکیشن
+                .setPriority(NotificationCompat.PRIORITY_HIGH) // اولویت بالا برای نوتیفیکیشن
+                .setAutoCancel(true); // حذف خودکار نوتیفیکیشن پس از کلیک
+
+        // نمایش نوتیفیکیشن
+        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (notificationManager != null) {
+            notificationManager.notify(1, builder.build()); // نمایش نوتیفیکیشن با شناسه 1
+        } else {
+            // نمایش پیام Toast در صورت عدم ارسال نوتیفیکیشن
+            Toast.makeText(this, "خطا در ارسال نوتیفیکیشن", Toast.LENGTH_SHORT).show(); // نمایش خطا
+        }
+    }
+}

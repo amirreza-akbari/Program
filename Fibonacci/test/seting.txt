@@ -1,0 +1,100 @@
+package com.example.healthcheckapp; // تعریف پکیج اپلیکیشن
+
+import android.content.Intent; // وارد کردن کلاس Intent برای جابجایی بین اکتیویتی‌ها
+import android.graphics.Color; // وارد کردن کلاس Color برای استفاده از رنگ‌ها
+import android.os.Bundle; // وارد کردن کلاس Bundle برای مدیریت داده‌ها در فعالیت‌ها
+import android.view.View; // وارد کردن کلاس View برای مدیریت نمایش‌های مختلف در رابط کاربری
+import android.widget.AdapterView; // وارد کردن کلاس AdapterView برای مدیریت انتخاب‌های اسپینر
+import android.widget.ArrayAdapter; // وارد کردن کلاس ArrayAdapter برای نمایش گزینه‌های اسپینر
+import android.widget.Spinner; // وارد کردن کلاس Spinner برای نمایش لیست کشویی
+import android.widget.Switch; // وارد کردن کلاس Switch برای استفاده از سوئیچ‌ها
+import androidx.appcompat.app.AppCompatActivity; // وارد کردن کلاس AppCompatActivity برای استفاده از اکتیویتی‌ها
+import androidx.cardview.widget.CardView; // وارد کردن کلاس CardView برای استفاده از کارت‌های استایل دار
+
+import com.example.healthcheckapp.utils.LocaleManager; // وارد کردن کلاس LocaleManager برای مدیریت زبان
+import com.example.healthcheckapp.utils.ThemeManager; // وارد کردن کلاس ThemeManager برای مدیریت تم
+import com.google.android.material.button.MaterialButton; // وارد کردن کلاس MaterialButton برای استفاده از دکمه‌های متریال
+
+public class SettingsActivity extends AppCompatActivity { // تعریف اکتیویتی تنظیمات
+    @Override
+    protected void onCreate(Bundle savedInstanceState) { // متد onCreate که در هنگام ساخت اکتیویتی اجرا می‌شود
+        // تنظیم زبان قبل از نمایش UI
+        LocaleManager.setLocale(this, LocaleManager.getLanguage(this));
+
+        // تنظیم تم (تاریک یا روشن) قبل از نمایش اکتیویتی
+        if (ThemeManager.isDarkMode(this)) {
+            setTheme(R.style.Theme_MyApp_Dark); // اعمال تم تاریک
+        } else {
+            setTheme(R.style.Theme_MyApp_Light); // اعمال تم روشن
+        }
+
+        // مخفی کردن نوار ابزار (ActionBar)
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide(); // پنهان کردن نوار ابزار
+        }
+
+        super.onCreate(savedInstanceState); // فراخوانی متد اصلی onCreate
+        setContentView(R.layout.activity_settings); // تعیین محتوای صفحه تنظیمات
+
+        // دریافت شناسه CardView برای استایل‌دهی
+        CardView cardView = findViewById(R.id.cardView);
+
+        // تنظیم رنگ پس‌زمینه کارت بر اساس تم
+        if (ThemeManager.isDarkMode(this)) {
+            cardView.setCardBackgroundColor(Color.parseColor("#0f4b6f")); // رنگ آبی تیره برای تم تاریک
+        } else {
+            cardView.setCardBackgroundColor(Color.parseColor("#FFFFFF")); // رنگ سفید برای تم روشن
+        }
+
+        // اینیشیالیز کردن سوئیچ تم (تغییر تم تاریک یا روشن)
+        Switch switchTheme = findViewById(R.id.switch_theme);
+        switchTheme.setChecked(ThemeManager.isDarkMode(this)); // تنظیم وضعیت سوئیچ بر اساس تم فعلی
+        switchTheme.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            // ذخیره تم انتخابی و راه‌اندازی مجدد برنامه
+            ThemeManager.saveTheme(this, isChecked);
+            restartApp(); // راه‌اندازی مجدد اپ برای اعمال تغییرات تم
+        });
+
+        // اینیشیالیز کردن اسپینر انتخاب زبان
+        Spinner spinnerLanguage = findViewById(R.id.spinner_language);
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+                R.array.language_options, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerLanguage.setAdapter(adapter);
+
+        // تنظیم مقدار پیش‌فرض برای اسپینر زبان بر اساس زبان ذخیره شده
+        String currentLanguage = LocaleManager.getLanguage(this);
+        spinnerLanguage.setSelection(currentLanguage.equals("fa") ? 0 : 1);
+
+        // شنونده برای زمانی که یک زبان انتخاب می‌شود
+        spinnerLanguage.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                // تغییر زبان بر اساس انتخاب و بازسازی اکتیویتی
+                String selectedLanguage = (position == 0) ? "fa" : "en";
+                if (!selectedLanguage.equals(LocaleManager.getLanguage(SettingsActivity.this))) {
+                    LocaleManager.setLocale(SettingsActivity.this, selectedLanguage);
+                    recreate(); // بازسازی اکتیویتی تنظیمات
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {} // انجام هیچ کاری در صورت عدم انتخاب زبان
+        });
+
+        // اینیشیالیز کردن دکمه "بازگشت به صفحه اصلی"
+        MaterialButton btnBackToMain = findViewById(R.id.btnBackToMain);
+        btnBackToMain.setOnClickListener(v -> {
+            finish(); // بستن این اکتیویتی و بازگشت به صفحه قبلی
+        });
+    }
+
+    // متد برای راه‌اندازی مجدد اپ بعد از تغییر تم
+    private void restartApp() {
+        // راه‌اندازی مجدد اپ با تنظیمات جدید تم
+        Intent intent = new Intent(getApplicationContext(), MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK); // تنظیم پرچم‌ها برای پاک کردن استک و ایجاد فعالیت جدید
+        startActivity(intent); // شروع اکتیویتی جدید
+        finish(); // بستن اکتیویتی فعلی برای جلوگیری از باقی ماندن آن در استک
+    }
+}

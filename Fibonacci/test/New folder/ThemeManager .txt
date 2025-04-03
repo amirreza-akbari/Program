@@ -1,0 +1,31 @@
+package com.example.healthcheckapp.utils;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+public class ThemeManager {
+    // نام فایل SharedPreferences که تنظیمات تم در آن ذخیره می‌شود
+    private static final String PREF_NAME = "theme_prefs";
+    // کلید برای ذخیره انتخاب تم (تاریک یا روشن)
+    private static final String KEY_THEME = "selected_theme";
+
+    // متدی برای ذخیره تنظیمات تم (حالت تاریک یا روشن)
+    public static void saveTheme(Context context, boolean isDarkMode) {
+        // دسترسی به SharedPreferences برای ذخیره تنظیمات تم
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        // باز کردن ویرایشگر SharedPreferences برای تغییر تنظیمات
+        SharedPreferences.Editor editor = prefs.edit();
+        // ذخیره مقدار بولی که نشان‌دهنده فعال بودن حالت تاریک است
+        editor.putBoolean(KEY_THEME, isDarkMode);
+        // اعمال تغییرات
+        editor.apply();
+    }
+
+    // متدی برای بررسی اینکه آیا حالت تاریک فعال است یا نه
+    public static boolean isDarkMode(Context context) {
+        // دسترسی به SharedPreferences برای بازیابی تنظیمات تم ذخیره‌شده
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        // برگرداندن مقدار ذخیره‌شده؛ مقدار پیش‌فرض false (حالت روشن) است
+        return prefs.getBoolean(KEY_THEME, false);
+    }
+}
